@@ -23,6 +23,3 @@ jobs:
 
       - name: Run tests
         run: npm run test
-
-      - name: unit test coverage report
-        run: npm run test -- --coverage
