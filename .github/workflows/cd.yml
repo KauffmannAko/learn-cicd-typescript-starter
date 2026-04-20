@@ -7,6 +7,12 @@ on:
 jobs:
   Deploy:
     runs-on: ubuntu-latest
+    env:
+      GCP_PROJECT_ID: notely-493712
+      GCP_REGION: us-central1
+      SERVICE_NAME: notely
+      IMAGE_REPOSITORY: notely-ar-repo
+      IMAGE_NAME: notely-image
 
     permissions:
       contents: read
@@ -38,10 +44,28 @@ jobs:
         with:
           version: '>= 363.0.0'
 
+      - name: Configure gcloud project
+        run: gcloud config set project "$GCP_PROJECT_ID"
+
+      - name: Verify required Google Cloud APIs
+        run: |
+          for api in run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com; do
+            if ! gcloud services list --enabled --filter="config.name=${api}" --format="value(config.name)" | grep -qx "${api}"; then
+              echo "Required API is not enabled: ${api}"
+              exit 1
+            fi
+          done
+
       - name: Build and push image with Cloud Build
         run: |
           gcloud builds submit \
-            --tag us-central1-docker.pkg.dev/notely-493712/notely-ar-repo/notely-image:latest .
+            --tag ${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${IMAGE_REPOSITORY}/${IMAGE_NAME}:latest .
 
       - name: Deploy to Cloud Run
-        run: gcloud run deploy notely --image REGION-docker.pkg.dev/notely-493712/notely-ar-repo/notely-image:latest --region us-central1 --allow-unauthenticated --project notely-493712 --max-instances=4
+        run: |
+          gcloud run deploy "$SERVICE_NAME" \
+            --image ${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${IMAGE_REPOSITORY}/${IMAGE_NAME}:latest \
+            --region "$GCP_REGION" \
+            --allow-unauthenticated \
+            --project "$GCP_PROJECT_ID" \
+            --max-instances=4
